@@ -48,6 +48,10 @@ button:active{transform:scale(.98);filter:brightness(.9)}
 .item span{display:block;font-size:12.5px;color:var(--mut);margin-top:2px}
 .item .ch{margin-left:auto;width:20px;height:20px;stroke:var(--mut);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .pg{text-align:center;padding-top:40px}
+.mb{display:flex;align-items:center;gap:8px;margin:0 0 10px}
+.mb .lb{flex:1;text-align:center;font-weight:700;font-size:16px}
+.mb .lb small{display:block;color:var(--mut);font-size:12px;font-weight:400;margin-top:2px}
+.mb button{width:44px;height:44px;padding:0;font-size:24px;background:var(--card);border:1.5px solid var(--line);flex:none}
 @media print{#mt .rp,#mt .rp *{visibility:visible}#mt .rp{position:absolute;left:0;top:0;width:100%;background:#fff;color:#000}}
 .tw{overflow-x:auto}
 .gt{border-collapse:collapse;width:100%;min-width:520px;font-size:13px}
@@ -129,6 +133,7 @@ button:active{transform:scale(.98);filter:brightness(.9)}
   </div>
   <div id="isl" class="hide">
    <div class="top"><h1>Yapılacak İş Listesi</h1><button id="ibk" type="button">← Ana Sayfa</button></div>
+   <div id="mb"></div>
    <div class="chips" id="fc"></div>
    <button id="inew" type="button" style="margin:0 0 14px">+ Yeni Görev</button>
    <div id="tl"></div>
@@ -151,7 +156,7 @@ button:active{transform:scale(.98);filter:brightness(.9)}
    <datalist id="dl-p"></datalist><datalist id="dl-m"></datalist>
   </div>
  </section>
- <div class="foot">Twins Mobilya · İş Takip · v2</div>
+ <div class="foot">Twins Mobilya · İş Takip · v2.1</div>
 </main>
 <script>
 var SS="twins_sess";
@@ -404,7 +409,7 @@ async function delTk(){
 function openTk(t){isNew=!t;cur=t?JSON.parse(JSON.stringify(t)):{no:T.n,oran:"0"};buildForm()}
 var FL=[["Tümü",""],["Süren işler","s"],["Tamamlanan","t"],["Arşiv","a"]];
 function renderList(){
- var fc=document.getElementById("fc");fc.innerHTML="";
+ mbRender();var fc=document.getElementById("fc");fc.innerHTML="";
  FL.forEach(function(f){var b=mk("button",flt===f[1]?"on":"",f[0]);b.type="button";b.onclick=function(){flt=f[1];renderList()};fc.appendChild(b)});
  var tl=document.getElementById("tl");tl.innerHTML="";
  var L=T.list.filter(function(x){
@@ -413,7 +418,8 @@ function renderList(){
   if(flt==="s")return lc(x.durum||"")==="sürüyor";
   if(flt==="t")return lc(x.durum||"")==="tamamlandı"||x.oran==="100";
   return true;
- }).sort(function(a,b){return a.no-b.no});
+ }).filter(function(x){return inMonth(x,mo)}).sort(function(a,b){return a.no-b.no});
+ var cn=document.getElementById("mcnt");if(cn)cn.textContent=L.length+" görev";
  if(!L.length){tl.appendChild(mk("div","empty","Bu listede görev yok."));return}
  L.forEach(function(x){
   var c=mk("div","tk"),h=mk("div","h");
@@ -422,7 +428,8 @@ function renderList(){
   c.appendChild(h);
   if(x.gorev)c.appendChild(mk("div","g",x.gorev));
   var pb=mk("div","pb"),bi=mk("i");bi.style.width=(parseInt(x.oran,10)||0)+"%";pb.appendChild(bi);c.appendChild(pb);
-  var m=[x.kod,x.cizen,x.oncelik,x.st?"bitiş "+fd(x.st):"",x.oran?"%"+x.oran:""].filter(Boolean).join(" · ");
+  var bm=x.bt?x.bt.slice(0,7):"",dv=(mo!=="all"&&mo!=="none"&&bm&&bm<mo)?"↪ "+MON[parseInt(bm.slice(5),10)-1]+" ayından devreden":(!bm&&mo===curYm?"tarihsiz":"");
+  var m=[dv,x.kod,x.cizen,x.oncelik,x.st?"bitiş "+fd(x.st):"",x.oran?"%"+x.oran:""].filter(Boolean).join(" · ");
   if(m)c.appendChild(mk("div","m",m));
   c.onclick=function(){openTk(x)};tl.appendChild(c);
  });
@@ -499,6 +506,33 @@ async function savePdf(name,title,head,rows,wts,msg){
  }catch(e){msg.textContent=(e&&e.name==="AbortError")?"":"PDF oluşturulamadı: "+(e&&e.message?e.message:e)}
 }
 function pd(n){return (n<10?"0":"")+n}
+var MON=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
+var curYm=todayIso().slice(0,7),mo=curYm;
+function ymName(y){var p=y.split("-");return MON[parseInt(p[1],10)-1]+" "+p[0]}
+function ymAdd(y,n){var p=y.split("-"),d=new Date(parseInt(p[0],10),parseInt(p[1],10)-1+n,1);return d.getFullYear()+"-"+pd(d.getMonth()+1)}
+function unfin(x){return !x.arsiv&&["tamamlandı","iptal edildi"].indexOf(lc(x.durum||""))<0&&x.oran!=="100"}
+function inMonth(x,ym){
+ if(ym==="all")return true;
+ var bm=x.bt?x.bt.slice(0,7):"";
+ if(ym==="none")return !bm;
+ if(!bm)return ym===curYm;
+ return bm===ym||(unfin(x)&&bm<ym&&ym<=curYm);
+}
+function mbRender(){
+ var b=document.getElementById("mb");b.innerHTML="";
+ var row=mk("div","mb"),pv=mk("button","","‹"),nx=mk("button","","›"),lb=mk("div","lb");
+ pv.type=nx.type="button";
+ var named=mo!=="all"&&mo!=="none";
+ lb.appendChild(document.createTextNode(mo==="all"?"Tüm aylar":(mo==="none"?"Tarihsiz":ymName(mo))));
+ var sm=mk("small","","");sm.id="mcnt";lb.appendChild(sm);
+ pv.onclick=function(){mo=named?ymAdd(mo,-1):curYm;renderList()};
+ nx.onclick=function(){mo=named?ymAdd(mo,1):curYm;renderList()};
+ row.appendChild(pv);row.appendChild(lb);row.appendChild(nx);b.appendChild(row);
+ var ch=mk("div","chips");
+ [["Bu ay",curYm],["Tüm aylar","all"],["Tarihsiz","none"]].forEach(function(f){var c=mk("button",mo===f[1]?"on":"",f[0]);c.type="button";c.onclick=function(){mo=f[1];renderList()};ch.appendChild(c)});
+ b.appendChild(ch);
+}
+
 function todayIso(){var d=new Date();return d.getFullYear()+"-"+pd(d.getMonth()+1)+"-"+pd(d.getDate())}
 function gsRow(x){return [x.musteri,x.gorev,x.renk,x.tanim,x.adet,x.ilerleme].map(function(v){return v==null?"":v})}
 function gsMake(){
